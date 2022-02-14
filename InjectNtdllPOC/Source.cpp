@@ -65,7 +65,7 @@ DWORD FindProcessId(const std::wstring& processName)
 	return 0;
 }
 
-BOOL Inject_SetDebugPrivilege() {
+BOOL AdjustPrivileges() {
 	BOOL bRet = FALSE;
 	HANDLE hToken = NULL;
 	LUID luid = { 0 };
@@ -291,25 +291,8 @@ void DebuggerMainLoop() {
 	CONTEXT currentContext;
 	for (;;)
 	{
-		// Wait for a debugging event to occur. The second parameter indicates
-		// that the function does not return until a debugging event occurs. 
-
 		WaitForDebugEvent(DebugEv, INFINITE);
 		if (targetThread == DebugEv->dwThreadId)
-
-		//if (DebugEv->dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT) {
-		//	// This event is the first triggered when the debugger attach!
-		//	printf("Is this the first and only one?\n");
-		//	hTargetThread = DebugEv->u.CreateProcessInfo.hThread;
-		//	targetThread = DebugEv->dwThreadId;
-		//	if (hTargetThread == NULL) {
-		//		printf("Not enough privileges to write inside the thread");
-		//		break;
-		//	}
-		//	GetThreadContext(hTargetThread, &Global_OrigContext);
-		//	ContinueDebugEvent(DebugEv->dwProcessId, DebugEv->dwThreadId, DBG_CONTINUE);
-		//	continue;
-		//}
 
 		if (DebugEv->dwDebugEventCode == CREATE_THREAD_DEBUG_EVENT) {
 			printf("This event is fired for every thread resumed %d\n", DebugEv->dwThreadId);
@@ -421,41 +404,18 @@ void DebuggerMainLoop() {
 	}
 
 	system("pause");
-	//detach();
-}
-
-HANDLE SelectTargetThread(DWORD threadId) {
-	HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-	if (hThreadSnap != INVALID_HANDLE_VALUE) {
-		THREADENTRY32 th32;
-		th32.dwSize = sizeof(THREADENTRY32);
-		BOOL bOK = TRUE;
-		for (bOK = Thread32First(hThreadSnap, &th32); bOK;
-			bOK = Thread32Next(hThreadSnap, &th32)) {
-			if (th32.th32OwnerProcessID == threadId) {
-				HANDLE hThread = OpenThread(THREAD_ALL_ACCESS,
-					TRUE, th32.th32ThreadID);
-				if (hThread)
-					return hThread;
-				else
-					continue;
-			}
-		}
-	}
-	system("pause");
-	return NULL;
 }
 
 int main(int argc, char** argv)
 {
 
 	if (argc < 2) {
-		printf("Usage: %s processToInject", argv[0]);
+		printf("Usage: %s [processToInject]", argv[0]);
 		exit(1);
 	}
 
 	printf("[+] Getting seDebugPrivilege\n");
-	if (!Inject_SetDebugPrivilege()) {
+	if (!AdjustPrivileges()) {
 		printf("[-] Unable to get privileges");
 		exit(1);
 	}
@@ -469,13 +429,6 @@ int main(int argc, char** argv)
 		printf("[-] Unable to find target Pid");
 		exit(1);
 	}
-
-	//hTargetThread = SelectTargetThread(targetPid);
-
-	/*if (hTargetThread == NULL) {
-		printf("[-] Unable to open target thread handle");
-		exit(1);
-	}*/
 
 	printf("[+] Scanning ntdll to populate instruction list...\n");
 
